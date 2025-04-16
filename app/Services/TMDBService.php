@@ -46,16 +46,32 @@ class TMDBService
 
         $movie = $response->json();
 
+        if (
+            empty($movie['title']) &&
+            empty($movie['genres']) &&
+            empty($movie['overview']) &&
+            empty($movie['runtime']) &&
+            empty($movie['vote_average']) &&
+            empty($movie['release_date']) &&
+            empty($movie['backdrop_path'])
+        ) {
+            return ['No data found'];
+        }
+
         return [
-            'title' => $movie['title'] ?? null,
-            'genres' => collect($movie['genres'])->pluck('name')->all(),
-            'description' => $movie['overview'] ?? null,
-            'runtime' => $movie['runtime'] ?? null,
-            'rating' => $movie['vote_average'] ?? null,
-            'year' => isset($movie['release_date']) ? substr($movie['release_date'], 0, 4) : null,
-            'image' => isset($movie['backdrop_path'])
+            'title' => $movie['title'] ?? 'Unknown Title',
+            'genres' => !empty($movie['genres'])
+                ? collect($movie['genres'])->pluck('name')->all()
+                : ['Unknown Genre'],
+            'description' => $movie['overview'] ?? 'No description available.',
+            'runtime' => $movie['runtime'] ?? 0,
+            'rating' => $movie['vote_average'] ?? 'N/A',
+            'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
+                ? substr($movie['release_date'], 0, 4)
+                : 'Unknown',
+            'image' => !empty($movie['backdrop_path'])
                 ? 'https://image.tmdb.org/t/p/w1280' . $movie['backdrop_path']
-                : null,
+                : 'https://via.placeholder.com/1280x720?text=No+Image+Available',
         ];
     }
 
