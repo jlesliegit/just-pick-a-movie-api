@@ -15,7 +15,7 @@ class GenreSeeder extends Seeder
     {
         $response = Http::get('https://api.themoviedb.org/3/genre/movie/list', [
             'api_key' => env('TMDB_API_KEY'),
-            'language' => 'en-US'
+            'language' => 'en-US',
         ]);
 
         $genres = $response->json()['genres'];
@@ -23,7 +23,7 @@ class GenreSeeder extends Seeder
         foreach ($genres as $genre) {
             DB::table('genres')->insert([
                 'id' => $genre['id'],
-                'name' => $genre['name']
+                'name' => $genre['name'],
             ]);
         }
     }
