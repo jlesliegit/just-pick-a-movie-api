@@ -9,7 +9,6 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-// Route::get('/movies', [MovieApiController::class, 'getMovies']);
 Route::get('/popular-movies', [MovieApiController::class, 'getPopularMovies']);
 Route::get('/movies', [TMDBService::class, 'getAllMovies']);
 Route::get('/movies/{movie}', [TMDBService::class, 'getSingle']);
