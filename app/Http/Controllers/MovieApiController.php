@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\TMDBService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MovieApiController extends Controller
@@ -14,7 +15,7 @@ class MovieApiController extends Controller
         $this->tmdbService = $tmdbService;
     }
 
-    public function getMovies(Request $request)
+    public function getMovies(Request $request): JsonResponse
     {
         $genre = $request->input('genre');
         $page = $request->input('page', 1);
@@ -24,7 +25,7 @@ class MovieApiController extends Controller
         return response()->json($movies);
     }
 
-    public function getPopularMovies()
+    public function getPopularMovies(): JsonResponse
     {
         $movies = $this->tmdbService->getPopularMovies();
 

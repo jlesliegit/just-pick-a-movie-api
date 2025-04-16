@@ -11,12 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('mood_genre', function (Blueprint $table) {
-            $table->foreignId('mood_id');
-            $table->bigInteger('tmdb_genre_id');
+        Schema::create('genres', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
             $table->timestamps();
-
-            $table->primary(['mood_id', 'tmdb_genre_id']);
         });
     }
 
@@ -25,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('mood_genre');
+        Schema::dropIfExists('genres');
     }
 };
