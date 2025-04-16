@@ -2,50 +2,36 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class TMDBServiceTest extends TestCase
 {
-    /**
-     * A basic feature test example.
-     */
-    public function testGetAllMoviesWithoutGenre()
+    public function test_get_all_movies_without_genre()
     {
-        // Mock the external HTTP request
         Http::fake([
             'https://api.themoviedb.org/3/discover/movie*' => Http::response([
                 'results' => [],
                 'page' => 1,
                 'total_results' => 0,
-                'total_pages' => 1
+                'total_pages' => 1,
             ], 200),
         ]);
 
-        // Your actual method that performs the HTTP request (e.g., in a controller)
         $params = [
-            'api_key' => 'your_api_key_here',
+            'api_key' => '',
             'page' => 1,
         ];
         $response = Http::get('https://api.themoviedb.org/3/discover/movie', $params);
 
-        // Convert the response to an array
         $responseData = $response->json();
 
-        // Assert that the response contains the correct keys
         $this->assertArrayHasKey('results', $responseData);
         $this->assertEquals(0, $responseData['total_results']);
         $this->assertEquals(1, $responseData['total_pages']);
     }
 
-    /**
-     * Test fetching all movies with a specific genre.
-     *
-     * @return void
-     */
-    public function testGetAllMoviesWithGenre()
+    public function test_get_all_movies_with_genre()
     {
         Http::fake([
             'https://api.themoviedb.org/3/discover/movie*' => Http::response([
@@ -55,13 +41,13 @@ class TMDBServiceTest extends TestCase
                 ],
                 'page' => 1,
                 'total_results' => 2,
-                'total_pages' => 1
+                'total_pages' => 1,
             ], 200),
         ]);
 
         $genre = 28;
         $params = [
-            'api_key' => 'your_api_key_here',
+            'api_key' => '',
             'page' => 1,
             'with_genres' => $genre,
         ];
@@ -74,7 +60,7 @@ class TMDBServiceTest extends TestCase
         $this->assertEquals(1, $responseData['total_pages']);
     }
 
-    public function testGetAllMoviesApiFailure()
+    public function test_get_all_movies_api_failure()
     {
         Http::fake([
             'https://api.themoviedb.org/3/discover/movie*' => Http::response([], 500),
@@ -90,4 +76,71 @@ class TMDBServiceTest extends TestCase
 
         $this->assertEmpty($responseData);
     }
+    public function test_it_returns_movie_data_successfully()
+    {
+        Http::fake([
+            'https://api.themoviedb.org/3/movie/*' => Http::response([
+                'title' => 'Inception',
+                'genres' => [
+                    ['name' => 'Action'],
+                    ['name' => 'Sci-Fi'],
+                ],
+                'overview' => 'A mind-bending thriller',
+                'runtime' => 148,
+                'vote_average' => 8.8,
+                'release_date' => '2010-07-16',
+                'backdrop_path' => '/inception.jpg',
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/movies/123');
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'message' => 'Movie fetched successfully',
+            'data' => [
+                'title' => 'Inception',
+                'genres' => ['Action', 'Sci-Fi'],
+                'description' => 'A mind-bending thriller',
+                'runtime' => 148,
+                'rating' => 8.8,
+                'year' => '2010',
+                'image' => 'https://image.tmdb.org/t/p/w1280/inception.jpg',
+            ]
+        ]);
+    }
+
+    public function test_it_handles_missing_movie_data()
+    {
+        Http::fake([
+            'https://api.themoviedb.org/3/movie/*' => Http::response([
+                'title' => '',
+                'genres' => [],
+                'overview' => '',
+                'runtime' => null,
+                'vote_average' => null,
+                'release_date' => '',
+                'backdrop_path' => '',
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/movies/456');
+
+        $response->assertStatus(200);
+        $response->assertExactJson(['No data found']);
+    }
+
+    public function test_it_handles_api_failure()
+    {
+        Http::fake([
+            'https://api.themoviedb.org/3/movie/*' => Http::response([], 500),
+        ]);
+
+        $response = $this->getJson('/api/movies/789');
+
+        $response->assertStatus(200);
+        $response->assertExactJson(['No data found']);
+    }
 }
+
+
