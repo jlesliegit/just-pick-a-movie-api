@@ -91,19 +91,8 @@ class TMDBService
         return $response->json();
     }
 
-    use Illuminate\Support\Facades\Http;
-    use Tests\TestCase;
-
-class MovieTest extends TestCase
-{
-    /**
-     * Test fetching a single movie with valid data.
-     *
-     * @return void
-     */
     public function testGetSingleMovie()
     {
-        // Mock the external HTTP request for a single movie
         Http::fake([
             'https://api.themoviedb.org/3/movie/*' => Http::response([
                 'title' => 'Inception',
@@ -119,16 +108,13 @@ class MovieTest extends TestCase
             ], 200),
         ]);
 
-        // Test with a movie ID (e.g., ID = 123)
         $movieId = 123;
         $response = Http::get("https://api.themoviedb.org/3/movie/{$movieId}", [
             'api_key' => 'your_api_key_here',
         ]);
 
-        // Convert the response to an array
         $responseData = $response->json();
 
-        // Assert the response structure and data
         $this->assertEquals('Inception', $responseData['data']['title']);
         $this->assertEquals(['Action', 'Sci-Fi'], $responseData['data']['genres']);
         $this->assertEquals('A mind-bending thriller', $responseData['data']['description']);
@@ -154,7 +140,7 @@ class MovieTest extends TestCase
 
         $movieId = 123;
         $response = Http::get("https://api.themoviedb.org/3/movie/{$movieId}", [
-            'api_key' => 'your_api_key_here',
+            'api_key' => '',
         ]);
 
         $responseData = $response->json();
@@ -171,7 +157,7 @@ class MovieTest extends TestCase
 
         $movieId = 123;
         $response = Http::get("https://api.themoviedb.org/3/movie/{$movieId}", [
-            'api_key' => 'your_api_key_here',
+            'api_key' => '',
         ]);
 
         $responseData = $response->json();
