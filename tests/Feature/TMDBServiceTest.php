@@ -76,7 +76,7 @@ class TMDBServiceTest extends TestCase
 
         $this->assertEmpty($responseData);
     }
-    public function test_it_returns_movie_data_successfully()
+    public function test_returns_movie_data_successfully()
     {
         Http::fake([
             'https://api.themoviedb.org/3/movie/*' => Http::response([
@@ -110,7 +110,7 @@ class TMDBServiceTest extends TestCase
         ]);
     }
 
-    public function test_it_handles_missing_movie_data()
+    public function test_handles_missing_movie_data()
     {
         Http::fake([
             'https://api.themoviedb.org/3/movie/*' => Http::response([
@@ -130,7 +130,7 @@ class TMDBServiceTest extends TestCase
         $response->assertExactJson(['No data found']);
     }
 
-    public function test_it_handles_api_failure()
+    public function test_handles_api_failure()
     {
         Http::fake([
             'https://api.themoviedb.org/3/movie/*' => Http::response([], 500),
