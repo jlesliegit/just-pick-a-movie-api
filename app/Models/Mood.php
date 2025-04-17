@@ -3,9 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Mood extends Model
 {
-    protected $hidden = ['created_at', 'updated_at'];
+    protected $hidden = ['pivot', 'created_at', 'updated_at'];
+
+    public function genres():HasMany
+    {
+        return $this->hasMany(Genre::class);
+    }
 
 }
