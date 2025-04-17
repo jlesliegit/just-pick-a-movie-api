@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Genre;
 use App\Models\Mood;
 use App\Services\TMDBService;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +45,7 @@ class MovieApiController extends Controller
 
         $genreIds = $mood->genres->pluck('id')->toArray();
         $allMovies = collect();
+        $genreName = Genre::pluck('name', 'id')->toArray();
 
         foreach ($genreIds as $genreId) {
             $response = $this->tmdbService->getMoviesByGenre($genreId, $page);
@@ -57,12 +59,16 @@ class MovieApiController extends Controller
                 return count($matchingGenres) >= 2;
             })
             ->unique('id')
-            ->map(function ($movie) {
+            ->map(function ($movie) use ($genreName) {
+                $genreNames = collect($movie['genre_ids'] ?? [])
+                    ->map(fn($id) => $genreName[$id] ?? null)
+                    ->filter()
+                    ->values();
+
                 return [
                     'title' => $movie['title'] ?? null,
-                    'genres' => $movie['genre_ids'] ?? [],
+                    'genres' => $genreNames ?? [],
                     'description' => $movie['overview'] ?? null,
-                    'runtime' => $movie['runtime'] ?? null,
                     'rating' => $movie['vote_average'] ?? null,
                     'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
                     'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
