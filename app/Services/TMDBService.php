@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Mood;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 
@@ -91,4 +92,5 @@ class TMDBService
 
         return $response->json();
     }
+
 }
