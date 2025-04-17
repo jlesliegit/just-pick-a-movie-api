@@ -76,6 +76,7 @@ class TMDBServiceTest extends TestCase
 
         $this->assertEmpty($responseData);
     }
+
     public function test_returns_movie_data_successfully()
     {
         Http::fake([
@@ -106,7 +107,7 @@ class TMDBServiceTest extends TestCase
                 'rating' => 8.8,
                 'year' => '2010',
                 'image' => 'https://image.tmdb.org/t/p/w1280/inception.jpg',
-            ]
+            ],
         ]);
     }
 
@@ -142,5 +143,3 @@ class TMDBServiceTest extends TestCase
         $response->assertExactJson(['No data found']);
     }
 }
-
-

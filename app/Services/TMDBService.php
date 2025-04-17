@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Mood;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 
@@ -62,7 +61,7 @@ class TMDBService
 
         $movie = [
             'title' => $movie['title'] ?? 'Unknown Title',
-            'genres' => !empty($movie['genres'])
+            'genres' => ! empty($movie['genres'])
                 ? collect($movie['genres'])->pluck('name')->all()
                 : ['Unknown Genre'],
             'description' => $movie['overview'] ?? 'No description available.',
@@ -71,8 +70,8 @@ class TMDBService
             'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
                 ? substr($movie['release_date'], 0, 4)
                 : 'Unknown',
-            'image' => !empty($movie['backdrop_path'])
-                ? 'https://image.tmdb.org/t/p/w1280' . $movie['backdrop_path']
+            'image' => ! empty($movie['backdrop_path'])
+                ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
                 : 'https://via.placeholder.com/1280x720?text=No+Image+Available',
         ];
 
@@ -94,5 +93,4 @@ class TMDBService
 
         return $response->json();
     }
-
 }

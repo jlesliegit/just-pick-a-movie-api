@@ -6,7 +6,6 @@ use App\Models\Mood;
 use App\Services\TMDBService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class MovieApiController extends Controller
 {
@@ -37,12 +36,13 @@ class MovieApiController extends Controller
     public function getMoviesByMood($moodName)
     {
         $mood = Mood::where('name', $moodName)->first();
+        $page = \request()->query('page', 1);
 
         if ($mood) {
             $genres = $mood->genres;
             $genreIds = $genres->pluck('id')->toArray();
 
-            $movieData = $this->tmdbService->getMoviesByGenre($genreIds);
+            $movieData = $this->tmdbService->getMoviesByGenre($genreIds, $page);
 
             if ($movieData && isset($movieData['results'])) {
                 $filteredMovies = collect($movieData['results'])->map(function ($movie) {
@@ -53,13 +53,13 @@ class MovieApiController extends Controller
                         'runtime' => $movie['runtime'] ?? null,
                         'rating' => $movie['vote_average'] ?? null,
                         'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
-                        'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500' . $movie['poster_path'] : null,
+                        'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
                     ];
                 });
 
                 return response()->json([
                     'message' => "$moodName movies fetched successfully",
-                    'data' => $filteredMovies
+                    'data' => $filteredMovies,
                 ]);
             }
 
@@ -68,5 +68,4 @@ class MovieApiController extends Controller
             return response()->json(['error' => 'Mood not found'], 404);
         }
     }
-
 }

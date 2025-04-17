@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -22,14 +21,14 @@ class MoodSeeder extends Seeder
             'Gripping',
             'Serious',
             'Gritty',
-            'Chill'
+            'Chill',
         ];
 
         foreach ($moods as $mood) {
             DB::table('moods')->insert([
                 'name' => $mood,
                 'created_at' => now(),
-                'updated_at' => now()
+                'updated_at' => now(),
             ]);
         }
     }

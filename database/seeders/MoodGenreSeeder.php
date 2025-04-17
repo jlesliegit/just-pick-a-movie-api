@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Mood;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -23,7 +22,7 @@ class MoodGenreSeeder extends Seeder
             'Gripping' => [9648, 80, 53],
             'Serious' => [10752, 36, 18],
             'Gritty' => [37, 80, 53],
-            'Chill' => [10770, 35, 16]
+            'Chill' => [10770, 35, 16],
         ];
 
         foreach ($moodGenreMap as $moodName => $genreIds) {
