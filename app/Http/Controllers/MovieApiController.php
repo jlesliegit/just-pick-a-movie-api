@@ -38,34 +38,45 @@ class MovieApiController extends Controller
         $mood = Mood::where('name', $moodName)->first();
         $page = \request()->query('page', 1);
 
-        if ($mood) {
-            $genres = $mood->genres;
-            $genreIds = $genres->pluck('id')->toArray();
-
-            $movieData = $this->tmdbService->getMoviesByGenre($genreIds, $page);
-
-            if ($movieData && isset($movieData['results'])) {
-                $filteredMovies = collect($movieData['results'])->map(function ($movie) {
-                    return [
-                        'title' => $movie['title'] ?? null,
-                        'genres' => $movie['genre_ids'] ?? [],
-                        'description' => $movie['overview'] ?? null,
-                        'runtime' => $movie['runtime'] ?? null,
-                        'rating' => $movie['vote_average'] ?? null,
-                        'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
-                        'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
-                    ];
-                });
-
-                return response()->json([
-                    'message' => "$moodName movies fetched successfully",
-                    'data' => $filteredMovies,
-                ]);
-            }
-
-            return response()->json(['error' => 'No movies found'], 404);
-        } else {
+        if (! $mood) {
             return response()->json(['error' => 'Mood not found'], 404);
         }
+
+        $genreIds = $mood->genres->pluck('id')->toArray();
+        $allMovies = collect();
+
+        foreach ($genreIds as $genreId) {
+            $response = $this->tmdbService->getMoviesByGenre($genreId, $page);
+            $allMovies = $allMovies->merge($response['results'] ?? []);
+        }
+
+        $filteredMovies = $allMovies
+            ->filter(function ($movie) use ($genreIds) {
+                $matchingGenres = array_intersect($movie['genre_ids'], $genreIds);
+
+                return count($matchingGenres) >= 2;
+            })
+            ->unique('id')
+            ->map(function ($movie) {
+                return [
+                    'title' => $movie['title'] ?? null,
+                    'genres' => $movie['genre_ids'] ?? [],
+                    'description' => $movie['overview'] ?? null,
+                    'runtime' => $movie['runtime'] ?? null,
+                    'rating' => $movie['vote_average'] ?? null,
+                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
+                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
+                ];
+            })
+            ->values();
+
+        if ($filteredMovies->isEmpty()) {
+            return response()->json(['error' => 'No matching movies found for this mood'], 404);
+        }
+
+        return response()->json([
+            'message' => "$moodName movies fetched successfully",
+            'data' => $filteredMovies,
+        ]);
     }
 }
