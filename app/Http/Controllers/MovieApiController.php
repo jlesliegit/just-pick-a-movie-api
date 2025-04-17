@@ -40,7 +40,7 @@ class MovieApiController extends Controller
 
         if ($mood) {
             $genres = $mood->genres;
-            $genreIds = $genres->pluck('tmdb_genre_id')->toArray();
+            $genreIds = $genres->pluck('id')->toArray();
 
             $movieData = $this->tmdbService->getMoviesByGenre($genreIds);
 

@@ -84,10 +84,12 @@ class TMDBService
 
     public function getMoviesByGenre($genreId, $page = 1)
     {
+        $genreParam = is_array($genreId) ? implode(',', $genreId) : $genreId;
+
         $response = Http::get('https://api.themoviedb.org/3/discover/movie', [
             'api_key' => $this->apiKey,
             'page' => $page,
-            'with_genres' => $genreId,
+            'with_genres' => $genreParam,
         ]);
 
         return $response->json();
