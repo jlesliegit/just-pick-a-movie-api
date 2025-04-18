@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Mood;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Request;
 
 class MoodController extends Controller
 {

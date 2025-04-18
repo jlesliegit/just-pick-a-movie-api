@@ -40,16 +40,18 @@ class MovieApiController extends Controller
         $page = \request()->query('page', 1);
 
         if (! $mood) {
-            return response()->json(['error' => 'MoodController not found'], 404);
+            return response()->json(['error' => 'Mood not found'], 404);
         }
 
         $genreIds = $mood->genres->pluck('id')->toArray();
         $allMovies = collect();
         $genreName = Genre::pluck('name', 'id')->toArray();
+        $totalPages = 1;
 
         foreach ($genreIds as $genreId) {
             $response = $this->tmdbService->getMoviesByGenre($genreId, $page);
             $allMovies = $allMovies->merge($response['results'] ?? []);
+            $totalPages = max($totalPages, $response['total_pages'] ?? 1);
         }
 
         $filteredMovies = $allMovies
@@ -67,7 +69,7 @@ class MovieApiController extends Controller
 
                 return [
                     'title' => $movie['title'] ?? null,
-                    'genres' => $genreNames ?? 'No associated genres',
+                    'genres' => $genreNames,
                     'description' => $movie['overview'] ?? null,
                     'rating' => $movie['vote_average'] ?? null,
                     'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
@@ -82,6 +84,8 @@ class MovieApiController extends Controller
 
         return response()->json([
             'message' => "$moodName movies fetched successfully",
+            'current_page' => (int) $page,
+            'total_pages' => $totalPages,
             'data' => $filteredMovies,
         ]);
     }

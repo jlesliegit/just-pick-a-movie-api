@@ -39,11 +39,15 @@ class TMDBService
         return $response->json();
     }
 
-    public function getSingle(int $id): JsonResponse|array
+    public function getSingle(int $id): JsonResponse
     {
         $response = Http::get("https://api.themoviedb.org/3/movie/$id", [
             'api_key' => $this->apiKey,
         ]);
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'TMDB API request failed'], $response->status());
+        }
 
         $movie = $response->json();
 
@@ -56,8 +60,26 @@ class TMDBService
             empty($movie['release_date']) &&
             empty($movie['backdrop_path'])
         ) {
-            return ['No data found'];
+            return response()->json(['error' => 'No movie data found'], 404);
         }
+
+        $similarResponse = Http::get("https://api.themoviedb.org/3/movie/{$id}/similar", [
+            'api_key' => $this->apiKey,
+        ]);
+
+        $similarMovies = $similarResponse->json()['results'] ?? [];
+
+        $formattedSimilar = collect($similarMovies)
+            ->take(5)
+            ->map(function ($similar) {
+                return [
+                    'id' => $similar['id'] ?? null,
+                    'title' => $similar['title'] ?? null,
+                    'image' => ! empty($similar['poster_path'])
+                        ? 'https://image.tmdb.org/t/p/w500'.$similar['poster_path']
+                        : 'https://via.placeholder.com/500x750?text=No+Image',
+                ];
+            });
 
         $movie = [
             'title' => $movie['title'] ?? 'Unknown Title',
@@ -74,6 +96,7 @@ class TMDBService
             'image' => ! empty($movie['backdrop_path'])
                 ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
                 : 'https://via.placeholder.com/1280x720?text=No+Image+Available',
+            'similar_movies' => $formattedSimilar,
         ];
 
         return response()->json([
