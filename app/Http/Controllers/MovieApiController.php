@@ -31,13 +31,16 @@ class MovieApiController extends Controller
     {
         $movies = $this->tmdbService->getPopularMovies();
 
-        return response()->json($movies);
+        return response()->json([
+            'message' => 'Popular movies successfully fetched',
+            'data' => $movies
+        ]);
     }
 
     public function getMoviesByMood($moodName): JsonResponse
     {
         $mood = Mood::where('name', $moodName)->first();
-        $page = \request()->query('page', 1);
+        $page = request()->query('page', 1);
 
         if (! $mood) {
             return response()->json(['error' => 'Mood not found'], 404);
@@ -84,8 +87,6 @@ class MovieApiController extends Controller
 
         return response()->json([
             'message' => "$moodName movies fetched successfully",
-            'current_page' => (int) $page,
-            'total_pages' => $totalPages,
             'data' => $filteredMovies,
         ]);
     }

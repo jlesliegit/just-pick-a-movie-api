@@ -26,8 +26,12 @@ class TMDBService
         }
 
         $response = Http::get('https://api.themoviedb.org/3/discover/movie', $params);
+        $movies = $response->json();
 
-        return $response->json();
+        return response()->json([
+            'message' => 'Movies fetched successfully',
+            'data' => $movies,
+        ]);
     }
 
     public function getPopularMovies()
@@ -45,10 +49,6 @@ class TMDBService
             'api_key' => $this->apiKey,
         ]);
 
-        if ($response->failed()) {
-            return response()->json(['error' => 'Failed to fetch data'], 500);
-        }
-
         $movie = $response->json();
 
         if (
@@ -61,6 +61,10 @@ class TMDBService
             empty($movie['backdrop_path'])
         ) {
             return response()->json(['error' => 'No data found'], 404);
+        }
+
+        if ($response->failed()) {
+            return response()->json(['error' => 'Failed to fetch data'], 500);
         }
 
         $similarResponse = Http::get("https://api.themoviedb.org/3/movie/{$id}/similar", [
