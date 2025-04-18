@@ -16,5 +16,5 @@ Route::get('/popular-movies', [MovieApiController::class, 'getPopularMovies']);
 Route::get('/movies/{movie}', [TMDBService::class, 'getSingle']);
 Route::get('movies/genres/{genre}', [TMDBService::class, 'getMoviesByGenre']);
 Route::get('/movies/mood/{mood}', [MovieApiController::class, 'getMoviesByMood']);
-Route::get('/movies/mood', [MoodController::class, 'all']);
-Route::get('/movies/genre', [GenreController::class, 'all']);
+Route::get('/mood', [MoodController::class, 'all']);
+Route::get('/genre', [GenreController::class, 'all']);
