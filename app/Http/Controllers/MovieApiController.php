@@ -34,13 +34,13 @@ class MovieApiController extends Controller
         return response()->json($movies);
     }
 
-    public function getMoviesByMood($moodName)
+    public function getMoviesByMood($moodName): JsonResponse
     {
         $mood = Mood::where('name', $moodName)->first();
         $page = \request()->query('page', 1);
 
         if (! $mood) {
-            return response()->json(['error' => 'Mood not found'], 404);
+            return response()->json(['error' => 'MoodController not found'], 404);
         }
 
         $genreIds = $mood->genres->pluck('id')->toArray();
@@ -61,13 +61,13 @@ class MovieApiController extends Controller
             ->unique('id')
             ->map(function ($movie) use ($genreName) {
                 $genreNames = collect($movie['genre_ids'] ?? [])
-                    ->map(fn($id) => $genreName[$id] ?? null)
+                    ->map(fn ($id) => $genreName[$id] ?? null)
                     ->filter()
                     ->values();
 
                 return [
                     'title' => $movie['title'] ?? null,
-                    'genres' => $genreNames ?? [],
+                    'genres' => $genreNames ?? 'No associated genres',
                     'description' => $movie['overview'] ?? null,
                     'rating' => $movie['vote_average'] ?? null,
                     'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,

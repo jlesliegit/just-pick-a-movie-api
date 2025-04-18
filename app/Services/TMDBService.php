@@ -65,6 +65,7 @@ class TMDBService
                 ? collect($movie['genres'])->pluck('name')->all()
                 : ['Unknown Genre'],
             'description' => $movie['overview'] ?? 'No description available.',
+            'tagline' => $movie['tagline'] ?? 'No tagline available.',
             'runtime' => $movie['runtime'] ?? 0,
             'rating' => $movie['vote_average'] ?? 'N/A',
             'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
