@@ -109,9 +109,43 @@ class TMDBService
         ]);
     }
 
-    public function getMoviesByGenre($genreId, $page = 1)
+    public function getGenreIdByName($genreName)
     {
-        $genreParam = is_array($genreId) ? implode(',', $genreId) : $genreId;
+        $response = Http::get('https://api.themoviedb.org/3/genre/movie/list', [
+            'api_key' => $this->apiKey,
+        ]);
+
+        $genres = collect($response->json('genres'));
+
+        $genre = $genres->firstWhere('name', ucfirst(strtolower($genreName)));
+
+        return $genre['id'] ?? null;
+    }
+
+    public function getMoviesByGenre($genreNameOrId, $page = 1)
+    {
+        if (! is_numeric($genreNameOrId)) {
+            $genreNames = is_array($genreNameOrId) ? $genreNameOrId : [$genreNameOrId];
+            $genreIds = [];
+
+            foreach ($genreNames as $name) {
+                $id = $this->getGenreIdByName($name);
+                if ($id) {
+                    $genreIds[] = $id;
+                }
+            }
+
+            if (empty($genreIds)) {
+                return response()->json([
+                    'message' => 'No valid genre found.',
+                    'data' => [],
+                ]);
+            }
+
+            $genreParam = implode(',', $genreIds);
+        } else {
+            $genreParam = $genreNameOrId;
+        }
 
         $response = Http::get('https://api.themoviedb.org/3/discover/movie', [
             'api_key' => $this->apiKey,

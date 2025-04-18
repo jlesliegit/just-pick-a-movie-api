@@ -33,7 +33,7 @@ class MovieApiController extends Controller
 
         return response()->json([
             'message' => 'Popular movies successfully fetched',
-            'data' => $movies
+            'data' => $movies,
         ]);
     }
 
