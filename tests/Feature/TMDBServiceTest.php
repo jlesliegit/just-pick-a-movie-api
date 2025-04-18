@@ -125,11 +125,14 @@ class TMDBServiceTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->getJson('/api/movies/456');
+        $response = $this->getJson('/api/movies/900');
 
-        $response->assertStatus(200);
-        $response->assertExactJson(['No data found']);
+        $response->assertStatus(404);
+        $response->assertJson([
+            'error' => 'No data found',
+        ]);
     }
+
 
     public function test_handles_api_failure()
     {
@@ -139,7 +142,9 @@ class TMDBServiceTest extends TestCase
 
         $response = $this->getJson('/api/movies/789');
 
-        $response->assertStatus(200);
-        $response->assertExactJson(['No data found']);
+        $response->assertStatus(500);
+        $response->assertJson([
+            'error' => 'Failed to fetch data'
+        ]);
     }
 }

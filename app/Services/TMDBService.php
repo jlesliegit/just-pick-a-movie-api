@@ -39,14 +39,14 @@ class TMDBService
         return $response->json();
     }
 
-    public function getSingle(int $id): JsonResponse
+    public function getSingle(int $id): JsonResponse|array
     {
         $response = Http::get("https://api.themoviedb.org/3/movie/$id", [
             'api_key' => $this->apiKey,
         ]);
 
         if ($response->failed()) {
-            return response()->json(['error' => 'TMDB API request failed'], $response->status());
+            return response()->json(['error' => 'Failed to fetch data'], 500);
         }
 
         $movie = $response->json();
@@ -60,7 +60,7 @@ class TMDBService
             empty($movie['release_date']) &&
             empty($movie['backdrop_path'])
         ) {
-            return response()->json(['error' => 'No movie data found'], 404);
+            return response()->json(['error' => 'No data found'], 404);
         }
 
         $similarResponse = Http::get("https://api.themoviedb.org/3/movie/{$id}/similar", [
