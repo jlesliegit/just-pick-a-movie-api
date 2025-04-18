@@ -7,8 +7,12 @@ use Illuminate\Database\Eloquent\Collection;
 
 class GenreController extends Controller
 {
-    public function all(): Collection
+    public function all(): \Illuminate\Http\JsonResponse
     {
-        return Genre::all(['id', 'name']);
+        $genres = Genre::all(['id', 'name']);
+        return response()->json([
+            'message' => 'Genres fetched successfully',
+            'data' => $genres
+        ]);
     }
 }
