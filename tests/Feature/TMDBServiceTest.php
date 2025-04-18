@@ -133,7 +133,6 @@ class TMDBServiceTest extends TestCase
         ]);
     }
 
-
     public function test_handles_api_failure()
     {
         Http::fake([
@@ -144,7 +143,7 @@ class TMDBServiceTest extends TestCase
 
         $response->assertStatus(500);
         $response->assertJson([
-            'error' => 'Failed to fetch data'
+            'error' => 'Failed to fetch data',
         ]);
     }
 }
