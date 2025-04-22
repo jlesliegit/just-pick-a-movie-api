@@ -74,9 +74,7 @@ class TMDBService
             'api_key' => $this->apiKey,
         ]);
 
-
         $movie = $response->json();
-
 
         if (
             empty($movie['title']) &&

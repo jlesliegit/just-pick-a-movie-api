@@ -12,7 +12,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::get('/movies', [TMDBService::class, 'getAllMovies']);
-Route::get('/popular-movies', [MovieApiController::class, 'getPopularMovies']);
+Route::get('/movies/popular-movies', [MovieApiController::class, 'getPopularMovies']);
 Route::get('/movies/{movie}', [TMDBService::class, 'getSingle']);
 Route::get('movies/genre/{genre}', [TMDBService::class, 'getMoviesByGenre']);
 Route::get('/movies/mood/{mood}', [MovieApiController::class, 'getMoviesByMood']);

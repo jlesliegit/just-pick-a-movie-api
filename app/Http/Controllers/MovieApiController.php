@@ -29,11 +29,36 @@ class MovieApiController extends Controller
 
     public function getPopularMovies(): JsonResponse
     {
-        $movies = $this->tmdbService->getPopularMovies();
+        $response = $this->tmdbService->getPopularMovies();
+        $movies = $response['results'] ?? [];
+
+        $genreName = Genre::pluck('name', 'id')->toArray();
+
+        $formattedMovies = collect($movies)
+            ->map(function ($movie) use ($genreName) {
+                $genreNames = collect($movie['genre_ids'] ?? [])
+                    ->map(fn ($id) => $genreName[$id] ?? null)
+                    ->filter()
+                    ->values();
+
+                return [
+                    'title' => $movie['title'] ?? null,
+                    'genres' => $genreNames,
+                    'description' => $movie['overview'] ?? null,
+                    'rating' => $movie['vote_average'] ?? null,
+                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
+                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
+                ];
+            })
+            ->values();
+
+        if ($formattedMovies->isEmpty()) {
+            return response()->json(['error' => 'No popular movies found'], 404);
+        }
 
         return response()->json([
             'message' => 'Popular movies successfully fetched',
-            'data' => $movies,
+            'data' => $formattedMovies,
         ]);
     }
 
