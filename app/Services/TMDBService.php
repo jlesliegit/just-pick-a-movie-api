@@ -102,7 +102,6 @@ class TMDBService
             ->take(5)
             ->map(function ($similar) {
                 return [
-                    'id' => $similar['id'] ?? null,
                     'title' => $similar['title'] ?? null,
                     'image' => ! empty($similar['poster_path'])
                         ? 'https://image.tmdb.org/t/p/w500'.$similar['poster_path']
