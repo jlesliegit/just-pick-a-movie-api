@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Genre;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 
@@ -14,7 +15,7 @@ class TMDBService
         $this->apiKey = env('TMDB_API_KEY');
     }
 
-    public function getAllMovies($page = 1, $genre = null)
+    public function getAllMovies($page = 1, $genre = null): JsonResponse
     {
         $params = [
             'api_key' => $this->apiKey,
@@ -28,9 +29,33 @@ class TMDBService
         $response = Http::get('https://api.themoviedb.org/3/discover/movie', $params);
         $movies = $response->json();
 
+        $genreName = Genre::pluck('name', 'id')->toArray();
+
+        $formattedMovies = collect($movies['results'] ?? [])
+            ->map(function ($movie) use ($genreName) {
+                $genreNames = collect($movie['genre_ids'] ?? [])
+                    ->map(fn ($id) => $genreName[$id] ?? null)
+                    ->filter()
+                    ->values();
+
+                return [
+                    'title' => $movie['title'] ?? null,
+                    'genres' => $genreNames,
+                    'description' => $movie['overview'] ?? null,
+                    'rating' => $movie['vote_average'] ?? null,
+                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
+                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
+                ];
+            })
+            ->values();
+
+        if ($formattedMovies->isEmpty()) {
+            return response()->json(['error' => 'No movies found'], 404);
+        }
+
         return response()->json([
             'message' => 'Movies fetched successfully',
-            'data' => $movies,
+            'data' => $formattedMovies,
         ]);
     }
 
@@ -49,7 +74,9 @@ class TMDBService
             'api_key' => $this->apiKey,
         ]);
 
+
         $movie = $response->json();
+
 
         if (
             empty($movie['title']) &&
