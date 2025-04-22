@@ -15,6 +15,42 @@ class TMDBService
         $this->apiKey = env('TMDB_API_KEY');
     }
 
+    protected function formatMoviesResponse(array $apiResponse, array $filterGenreIds = []): array
+    {
+        $genreNameMap = Genre::pluck('name', 'id')->toArray();
+
+        $movies = collect($apiResponse['results'] ?? [])
+            ->map(function ($movie) use ($genreNameMap, $filterGenreIds) {
+                // If filterGenreIds is provided, only include those genres
+                $genreIds = empty($filterGenreIds)
+                    ? ($movie['genre_ids'] ?? [])
+                    : array_intersect($movie['genre_ids'] ?? [], $filterGenreIds);
+
+                $genreNames = collect($genreIds)
+                    ->map(fn ($id) => $genreNameMap[$id] ?? null)
+                    ->filter()
+                    ->values();
+
+                return [
+                    'title' => $movie['title'] ?? null,
+                    'genres' => $genreNames,
+                    'description' => $movie['overview'] ?? null,
+                    'rating' => $movie['vote_average'] ?? null,
+                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
+                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        return [
+            'page' => $apiResponse['page'] ?? 1,
+            'total_pages' => $apiResponse['total_pages'] ?? 1,
+            'total_results' => $apiResponse['total_results'] ?? 0,
+            'results' => $movies,
+        ];
+    }
+
     public function getAllMovies($page = 1, $genre = null): JsonResponse
     {
         $params = [
@@ -146,9 +182,9 @@ class TMDBService
         return $genre['id'] ?? null;
     }
 
-    public function getMoviesByGenre($genreNameOrId, $page = 1)
+    public function getMoviesByGenre($genreNameOrId, $page = 1): JsonResponse
     {
-        if (! is_numeric($genreNameOrId)) {
+        if (!is_numeric($genreNameOrId)) {
             $genreNames = is_array($genreNameOrId) ? $genreNameOrId : [$genreNameOrId];
             $genreIds = [];
 
@@ -160,23 +196,63 @@ class TMDBService
             }
 
             if (empty($genreIds)) {
-                return response()->json([
-                    'message' => 'No valid genre found.',
-                    'data' => [],
-                ]);
+                return response()->json(['error' => 'No valid genre found'], 404);
             }
-
-            $genreParam = implode(',', $genreIds);
         } else {
-            $genreParam = $genreNameOrId;
+            $genreIds = [$genreNameOrId];
         }
 
         $response = Http::get('https://api.themoviedb.org/3/discover/movie', [
             'api_key' => $this->apiKey,
             'page' => $page,
-            'with_genres' => $genreParam,
+            'with_genres' => implode(',', $genreIds),
         ]);
 
-        return $response->json();
+        $movies = $response->json();
+        $genreNameMap = Genre::pluck('name', 'id')->toArray();
+
+        $formattedMovies = collect($movies['results'] ?? [])
+            ->map(function ($movie) use ($genreNameMap) {
+                $genreNames = collect($movie['genre_ids'] ?? [])
+                    ->map(fn ($id) => $genreNameMap[$id] ?? null)
+                    ->filter()
+                    ->values();
+
+                return [
+                    'title' => $movie['title'] ?? null,
+                    'genres' => $genreNames,
+                    'description' => $movie['overview'] ?? null,
+                    'rating' => $movie['vote_average'] ?? null,
+                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
+                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
+                    'tmdb_id' => $movie['id'] ?? null,
+                ];
+            })
+            ->values();
+
+        if ($formattedMovies->isEmpty()) {
+            return response()->json([
+                'error' => 'No movies found for the specified genre(s)',
+            ], 404);
+        }
+
+        $genreDisplayNames = collect($genreIds)
+            ->map(fn ($id) => $genreNameMap[$id] ?? null)
+            ->filter()
+            ->values()
+            ->implode(', ');
+
+        return response()->json([
+            'message' => "{$genreDisplayNames} movies fetched successfully",
+            'data' => [
+                'movies' => $formattedMovies,
+                'filtered_by_genres' => $genreDisplayNames,
+                'page_info' => [
+                    'current_page' => $movies['page'] ?? 1,
+                    'total_pages' => $movies['total_pages'] ?? 1,
+                    'total_results' => $movies['total_results'] ?? 0,
+                ]
+            ],
+        ]);
     }
 }
