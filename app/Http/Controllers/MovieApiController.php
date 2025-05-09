@@ -144,12 +144,7 @@ class MovieApiController extends Controller
         });
 
         return response()->json([
-            'meta' => [
-                'mood' => $mood->name,
-                'matched_genres' => $mood->genres->whereIn('id', $tmdbGenreIds)->pluck('name'),
-                'page' => (int)$page,
-                'total_movies' => $moviesWithNames->count()
-            ],
+            'message' => "$moodName movies fetched successfully",
             'data' => $moviesWithNames
         ]);
     }
