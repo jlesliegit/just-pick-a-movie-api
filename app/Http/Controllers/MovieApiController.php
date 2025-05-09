@@ -138,9 +138,20 @@ class MovieApiController extends Controller
                 ->values()
                 ->all();
 
-            $movie['genres'] = $genreNames;
-            unset($movie['genre_ids']);
-            return $movie;
+            return [
+                'title' => $movie['title'] ?? 'Unknown Title',
+                'genres' => !empty($genreNames) ? $genreNames : ['Unknown Genre'],
+                'description' => $movie['overview'] ?? 'No description available.',
+                'tagline' => $movie['tagline'] ?? 'No tagline available.',
+                'runtime' => $movie['runtime'] ?? 0,
+                'rating' => $movie['vote_average'] ?? 'N/A',
+                'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
+                    ? substr($movie['release_date'], 0, 4)
+                    : 'Unknown',
+                'image' => !empty($movie['backdrop_path'])
+                    ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
+                    : 'https://via.placeholder.com/1280x720?text=No+Image+Available',
+            ];
         });
 
         return response()->json([
