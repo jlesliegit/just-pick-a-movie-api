@@ -130,16 +130,28 @@ class MovieApiController extends Controller
             ], 404);
         }
 
+        $genreNameMap = Genre::pluck('name', 'id')->toArray();
+        $moviesWithNames = $uniqueMovies->map(function ($movie) use ($genreNameMap) {
+            $genreNames = collect($movie['genre_ids'] ?? [])
+                ->map(fn ($id) => $genreNameMap[$id] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+
+            $movie['genres'] = $genreNames;
+            unset($movie['genre_ids']);
+            return $movie;
+        });
+
         return response()->json([
             'meta' => [
                 'mood' => $mood->name,
                 'matched_genres' => $mood->genres->whereIn('id', $tmdbGenreIds)->pluck('name'),
                 'page' => (int)$page,
-                'total_movies' => $uniqueMovies->count()
+                'total_movies' => $moviesWithNames->count()
             ],
-            'data' => $uniqueMovies
+            'data' => $moviesWithNames
         ]);
     }
-
 
 }
