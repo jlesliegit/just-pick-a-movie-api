@@ -64,55 +64,76 @@ class MovieApiController extends Controller
 
     public function getMoviesByMood($moodName): JsonResponse
     {
-        $mood = Mood::where('name', $moodName)->first();
-        $page = request()->query('page', 1);
+        $mood = Mood::with('genres')->where('name', $moodName)->first();
 
         if (! $mood) {
-            return response()->json(['error' => 'Mood not found'], 404);
+            return response()->json([
+                'error' => 'Mood not found',
+                'available_moods' => Mood::pluck('name')->toArray(),
+            ], 404);
         }
 
-        $genreIds = $mood->genres->pluck('id')->toArray();
+        $tmdbGenreIds = $mood->genres->pluck('id')
+            ->filter(fn ($id) => is_numeric($id) && $id > 0)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if (empty($tmdbGenreIds)) {
+            return response()->json([
+                'error' => 'No valid genres associated',
+                'mood_details' => [
+                    'name' => $mood->name,
+                    'genre_count' => $mood->genres->count(),
+                    'genre_sample' => $mood->genres->take(3)->pluck('name', 'id'),
+                ],
+            ], 400);
+        }
+
         $allMovies = collect();
-        $genreName = Genre::pluck('name', 'id')->toArray();
-        $totalPages = 1;
+        $page = request()->query('page', 1);
+        $errors = [];
 
-        foreach ($genreIds as $genreId) {
-            $response = $this->tmdbService->getMoviesByGenre($genreId, $page);
-            $allMovies = $allMovies->merge($response['results'] ?? []);
-            $totalPages = max($totalPages, $response['total_pages'] ?? 1);
+        foreach ($tmdbGenreIds as $genreId) {
+            try {
+                $response = $this->tmdbService->getMoviesByGenre($genreId, $page);
+                $data = $response->getData(true);
+
+                if (isset($data['data']['movies'])) {
+                    $allMovies = $allMovies->merge($data['data']['movies']);
+                } else {
+                    $errors[$genreId] = 'No movie data found in response';
+                }
+            } catch (\Exception $e) {
+                $errors[$genreId] = $e->getMessage();
+            }
         }
 
-        $filteredMovies = $allMovies
-            ->filter(function ($movie) use ($genreIds) {
-                $matchingGenres = array_intersect($movie['genre_ids'], $genreIds);
+        $movies = $allMovies->unique('title')->values();
 
-                return count($matchingGenres) >= 2;
-            })
-            ->unique('id')
-            ->map(function ($movie) use ($genreName) {
-                $genreNames = collect($movie['genre_ids'] ?? [])
-                    ->map(fn ($id) => $genreName[$id] ?? null)
-                    ->filter()
-                    ->values();
+        if ($movies->isEmpty()) {
+            \Log::error("Movie fetch failed for mood '$moodName'", [
+                'genre_ids' => $tmdbGenreIds,
+                'errors' => $errors,
+            ]);
 
-                return [
-                    'title' => $movie['title'] ?? null,
-                    'genres' => $genreNames,
-                    'description' => $movie['overview'] ?? null,
-                    'rating' => $movie['vote_average'] ?? null,
-                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
-                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
-                ];
-            })
-            ->values();
-
-        if ($filteredMovies->isEmpty()) {
-            return response()->json(['error' => 'No matching movies found for this mood'], 404);
+            return response()->json([
+                'error' => 'No movies found for these genres',
+                'technical_details' => [
+                    'tried_genres' => $tmdbGenreIds,
+                    'api_errors' => $errors,
+                ],
+            ], 404);
         }
 
         return response()->json([
-            'message' => "$moodName movies fetched successfully",
-            'data' => $filteredMovies,
+            'meta' => [
+                'mood' => $mood->name,
+                'matched_genres' => $mood->genres->whereIn('id', $tmdbGenreIds)->pluck('name'),
+                'page' => (int) $page,
+                'total_movies' => $movies->count(),
+            ],
+            'data' => $movies,
         ]);
     }
 }

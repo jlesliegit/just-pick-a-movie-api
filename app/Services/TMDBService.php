@@ -184,7 +184,7 @@ class TMDBService
 
     public function getMoviesByGenre($genreNameOrId, $page = 1): JsonResponse
     {
-        if (!is_numeric($genreNameOrId)) {
+        if (! is_numeric($genreNameOrId)) {
             $genreNames = is_array($genreNameOrId) ? $genreNameOrId : [$genreNameOrId];
             $genreIds = [];
 
@@ -225,7 +225,7 @@ class TMDBService
                     'rating' => $movie['vote_average'] ?? null,
                     'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
                     'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
-                    'tmdb_id' => $movie['id'] ?? null,
+                    'tmdb_genre_id' => $movie['id'] ?? null,
                 ];
             })
             ->values();
@@ -251,7 +251,7 @@ class TMDBService
                     'current_page' => $movies['page'] ?? 1,
                     'total_pages' => $movies['total_pages'] ?? 1,
                     'total_results' => $movies['total_results'] ?? 0,
-                ]
+                ],
             ],
         ]);
     }
