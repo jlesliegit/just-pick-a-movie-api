@@ -143,8 +143,10 @@ class MovieApiController extends Controller
                 'genres' => !empty($genreNames) ? $genreNames : ['Unknown Genre'],
                 'description' => $movie['overview'] ?? 'No description available.',
                 'tagline' => $movie['tagline'] ?? 'No tagline available.',
-                'runtime' => $movie['runtime'] ?? 0,
                 'rating' => $movie['vote_average'] ?? 'N/A',
+                'runtime' => isset($movie['runtime']) && is_numeric($movie['runtime']) && $movie['runtime'] > 0
+                    ? $movie['runtime']
+                    : 'Not Available',
                 'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
                     ? substr($movie['release_date'], 0, 4)
                     : 'Unknown',

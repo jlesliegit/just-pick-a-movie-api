@@ -21,7 +21,6 @@ class TMDBService
 
         $movies = collect($apiResponse['results'] ?? [])
             ->map(function ($movie) use ($genreNameMap, $filterGenreIds) {
-                // If filterGenreIds is provided, only include those genres
                 $genreIds = empty($filterGenreIds)
                     ? ($movie['genre_ids'] ?? [])
                     : array_intersect($movie['genre_ids'] ?? [], $filterGenreIds);
