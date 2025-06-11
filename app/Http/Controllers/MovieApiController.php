@@ -2,64 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Genre;
 use App\Models\Mood;
-use App\Services\TMDBService;
+use App\Models\Genre;
+use App\Services\TmdbService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class MovieApiController extends Controller
 {
-    protected $tmdbService;
+    protected TmdbService $tmdbService;
 
-    public function __construct(TMDBService $tmdbService)
+    public function __construct(TmdbService $tmdbService)
     {
         $this->tmdbService = $tmdbService;
-    }
-
-    public function getMovies(Request $request): JsonResponse
-    {
-        $genre = $request->input('genre');
-        $page = $request->input('page', 1);
-
-        $movies = $this->tmdbService->getAllMovies($page, $genre);
-
-        return response()->json($movies);
-    }
-
-    public function getPopularMovies(): JsonResponse
-    {
-        $response = $this->tmdbService->getPopularMovies();
-        $movies = $response['results'] ?? [];
-
-        $genreName = Genre::pluck('name', 'id')->toArray();
-
-        $formattedMovies = collect($movies)
-            ->map(function ($movie) use ($genreName) {
-                $genreNames = collect($movie['genre_ids'] ?? [])
-                    ->map(fn ($id) => $genreName[$id] ?? null)
-                    ->filter()
-                    ->values();
-
-                return [
-                    'title' => $movie['title'] ?? null,
-                    'genres' => $genreNames,
-                    'description' => $movie['overview'] ?? null,
-                    'rating' => $movie['vote_average'] ?? null,
-                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
-                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
-                ];
-            })
-            ->values();
-
-        if ($formattedMovies->isEmpty()) {
-            return response()->json(['error' => 'No popular movies found'], 404);
-        }
-
-        return response()->json([
-            'message' => 'Popular movies successfully fetched',
-            'data' => $formattedMovies,
-        ]);
     }
 
     public function getMoviesByMood($moodName): JsonResponse
@@ -92,15 +46,12 @@ class MovieApiController extends Controller
 
         $allMovies = collect();
         $errors = [];
-        $page = request()->query('page', 20);
+        $page = request()->query('page', 1);
 
         foreach ($tmdbGenreIds as $genreId) {
             try {
                 $data = $this->tmdbService->getMoviesByGenre($genreId, $page);
                 $movies = $data['results'] ?? [];
-
-                \Log::debug("TMDB API Response for Genre ID {$genreId}: ", ['movie_count' => count($movies)]);
-
                 $allMovies = $allMovies->merge($movies);
             } catch (\Exception $e) {
                 $errors[$genreId] = $e->getMessage();
@@ -116,11 +67,6 @@ class MovieApiController extends Controller
         $uniqueMovies = $filteredMovies->unique('id')->values();
 
         if ($uniqueMovies->isEmpty()) {
-            \Log::warning("No matching movies found for mood '$moodName'", [
-                'genre_ids' => $tmdbGenreIds,
-                'errors' => $errors
-            ]);
-
             return response()->json([
                 'error' => 'No movies found for these genres',
                 'technical_details' => [
@@ -131,34 +77,109 @@ class MovieApiController extends Controller
         }
 
         $genreNameMap = Genre::pluck('name', 'id')->toArray();
-        $moviesWithNames = $uniqueMovies->map(function ($movie) use ($genreNameMap) {
-            $genreNames = collect($movie['genre_ids'] ?? [])
-                ->map(fn ($id) => $genreNameMap[$id] ?? null)
-                ->filter()
-                ->values()
-                ->all();
+        $moviesWithDetails = collect();
 
-            return [
-                'title' => $movie['title'] ?? 'Unknown Title',
-                'genres' => !empty($genreNames) ? $genreNames : ['Unknown Genre'],
-                'description' => $movie['overview'] ?? 'No description available.',
-                'tagline' => $movie['tagline'] ?? 'No tagline available.',
-                'rating' => $movie['vote_average'] ?? 'N/A',
-                'runtime' => isset($movie['runtime']) && is_numeric($movie['runtime']) && $movie['runtime'] > 0
-                    ? $movie['runtime']
-                    : 'Not Available',
-                'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
-                    ? substr($movie['release_date'], 0, 4)
-                    : 'Unknown',
-                'image' => !empty($movie['backdrop_path'])
-                    ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
-                    : 'https://via.placeholder.com/1280x720?text=No+Image+Available',
-            ];
-        });
+        foreach ($uniqueMovies as $movie) {
+            try {
+                $details = $this->tmdbService->getMovieDetails($movie['id']);
+
+                $genreNames = collect($movie['genre_ids'] ?? [])
+                    ->map(fn($id) => $genreNameMap[$id] ?? null)
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $moviesWithDetails->push([
+                    'id' => $movie['id'],
+                    'title' => $movie['title'] ?? $details['title'] ?? 'Unknown Title',
+                    'genres' => !empty($genreNames) ? $genreNames : ['Unknown Genre'],
+                    'description' => $movie['overview'] ?? $details['overview'] ?? 'No description available.',
+                    'tagline' => $details['tagline'] ?? 'No tagline available.',
+                    'rating' => $movie['vote_average'] ?? $details['vote_average'] ?? 'N/A',
+                    'runtime' => $details['runtime'] ?? 'Not Available',
+                    'release_date' => $movie['release_date'] ?? $details['release_date'] ?? null,
+                    'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
+                        ? substr($movie['release_date'], 0, 4)
+                        : (isset($details['release_date']) ? substr($details['release_date'], 0, 4) : 'Unknown'),
+                    'poster' => !empty($movie['poster_path'])
+                        ? 'https://image.tmdb.org/t/p/w500' . $movie['poster_path']
+                        : 'https://via.placeholder.com/500x750?text=No+Poster',
+                    'backdrop' => !empty($movie['backdrop_path'])
+                        ? 'https://image.tmdb.org/t/p/w1280' . $movie['backdrop_path']
+                        : 'https://via.placeholder.com/1280x720?text=No+Backdrop',
+                    'imdb_id' => $details['imdb_id'] ?? null,
+                    'status' => $details['status'] ?? null,
+                ]);
+            } catch (\Exception $e) {
+                \Log::error("Failed to process movie {$movie['id']}: " . $e->getMessage());
+                continue;
+            }
+        }
 
         return response()->json([
             'message' => "$moodName movies fetched successfully",
-            'data' => $moviesWithNames
+            'count' => $moviesWithDetails->count(),
+            'data' => $moviesWithDetails
+        ]);
+    }
+
+    public function getPopularMovies(): JsonResponse
+    {
+        $response = $this->tmdbService->getPopularMovies();
+        $movies = $response['results'] ?? [];
+
+        $genreName = Genre::pluck('name', 'id')->toArray();
+
+        $formattedMovies = collect($movies)
+            ->map(function ($movie) use ($genreName) {
+                try {
+                    $details = $this->tmdbService->getMovieDetails($movie['id']);
+
+                    $genreNames = collect($movie['genre_ids'] ?? [])
+                        ->map(fn ($id) => $genreName[$id] ?? null)
+                        ->filter()
+                        ->values();
+
+                    return [
+                        'id' => $movie['id'],
+                        'title' => $movie['title'] ?? $details['title'] ?? null,
+                        'genres' => $genreNames,
+                        'description' => $movie['overview'] ?? $details['overview'] ?? null,
+                        'rating' => $movie['vote_average'] ?? $details['vote_average'] ?? null,
+                        'runtime' => $details['runtime'] ?? null,
+                        'release_date' => isset($movie['release_date'])
+                            ? date('d/m/Y', strtotime($movie['release_date']))
+                            : (isset($details['release_date'])
+                                ? date('d/m/Y', strtotime($details['release_date']))
+                                : null),
+                        'year' => $movie['release_date']
+                            ? substr($movie['release_date'], 0, 4)
+                            : (isset($details['release_date'])
+                                ? substr($details['release_date'], 0, 4)
+                                : null),
+                        'poster' => $movie['poster_path']
+                            ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path']
+                            : null,
+                        'backdrop' => $movie['backdrop_path']
+                            ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
+                            : null,
+                        'tagline' => $details['tagline'] ?? null,
+                    ];
+                } catch (\Exception $e) {
+                    \Log::error("Failed to fetch details for movie {$movie['id']}: " . $e->getMessage());
+                    return null;
+                }
+            })
+            ->filter()
+            ->values();
+
+        if ($formattedMovies->isEmpty()) {
+            return response()->json(['error' => 'No popular movies found'], 404);
+        }
+
+        return response()->json([
+            'message' => 'Popular movies successfully fetched',
+            'data' => $formattedMovies,
         ]);
     }
 

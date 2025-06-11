@@ -3,52 +3,115 @@
 namespace App\Services;
 
 use App\Models\Genre;
+use DateTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 
 class TMDBService
 {
-    protected $apiKey;
+    protected string $apiKey;
+    protected string $baseUrl = 'https://api.themoviedb.org/3';
 
     public function __construct()
     {
         $this->apiKey = env('TMDB_API_KEY');
     }
 
-    protected function formatMoviesResponse(array $apiResponse, array $filterGenreIds = []): array
+    public function getMoviesByGenre($genreId, $page = 1): array
     {
-        $genreNameMap = Genre::pluck('name', 'id')->toArray();
+        $url = "https://api.themoviedb.org/3/discover/movie";
+        $params = [
+            'api_key' => $this->apiKey,
+            'with_genres' => $genreId,
+            'page' => $page,
+            'language' => 'en-US',
+            'include_adult' => false
+        ];
 
-        $movies = collect($apiResponse['results'] ?? [])
-            ->map(function ($movie) use ($genreNameMap, $filterGenreIds) {
-                $genreIds = empty($filterGenreIds)
-                    ? ($movie['genre_ids'] ?? [])
-                    : array_intersect($movie['genre_ids'] ?? [], $filterGenreIds);
+        $response = Http::retry(3, 100)->get($url, $params);
 
-                $genreNames = collect($genreIds)
-                    ->map(fn ($id) => $genreNameMap[$id] ?? null)
-                    ->filter()
-                    ->values();
+        if ($response->failed()) {
+            throw new \Exception("TMDB API failed: " . $response->body());
+        }
 
-                return [
-                    'title' => $movie['title'] ?? null,
-                    'genres' => $genreNames,
-                    'description' => $movie['overview'] ?? null,
-                    'rating' => $movie['vote_average'] ?? null,
-                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
-                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
-                ];
-            })
-            ->values()
-            ->toArray();
+        $data = $response->json();
+
+        // Get genre names mapping (you might want to cache this)
+        $genreList = $this->getGenreList();
+
+        $formattedResults = [];
+        foreach ($data['results'] as $movie) {
+            $formattedResults[] = $this->formatMovieData($movie, $genreList);
+        }
 
         return [
-            'page' => $apiResponse['page'] ?? 1,
-            'total_pages' => $apiResponse['total_pages'] ?? 1,
-            'total_results' => $apiResponse['total_results'] ?? 0,
-            'results' => $movies,
+            'success' => !empty($formattedResults),
+            'page' => $data['page'] ?? $page,
+            'total_pages' => $data['total_pages'] ?? 0,
+            'total_results' => $data['total_results'] ?? 0,
+            'results' => $formattedResults,
+            'genre_id' => $genreId
         ];
     }
+
+    protected function getGenreList(): array
+    {
+        $response = Http::get("https://api.themoviedb.org/3/genre/movie/list", [
+            'api_key' => $this->apiKey,
+            'language' => 'en-US'
+        ]);
+
+        if ($response->successful()) {
+            $genres = $response->json()['genres'] ?? [];
+            return array_combine(array_column($genres, 'id'), array_column($genres, 'name'));
+        }
+
+        return [];
+    }
+
+    protected function formatMovieData(array $movie, array $genreList): array
+    {
+        $releaseDate = null;
+        $year = null;
+
+        if (!empty($movie['release_date'])) {
+            try {
+                $date = new DateTime($movie['release_date']);
+                $releaseDate = $date->format('d/m/Y');
+                $year = $date->format('Y');
+            } catch (Exception $e) {
+                $releaseDate = $movie['release_date'];
+                $year = substr($movie['release_date'], 0, 4);
+            }
+        }
+
+        return [
+            'id' => $movie['id'] ?? null,
+            'title' => $movie['title'] ?? null,
+            'genres' => array_filter(array_map(function($genreId) use ($genreList) {
+                return $genreList[$genreId] ?? null;
+            }, $movie['genre_ids'] ?? [])),¬
+            'description' => $movie['overview'] ?? null,
+            'rating' => isset($movie['vote_average']) ? round($movie['vote_average'], 1) : null,
+//            'runtime' => null,
+            'release_date' => $releaseDate,
+            'year' => $year,
+            'poster' => $movie['poster_path'] ? "https://image.tmdb.org/t/p/w500{$movie['poster_path']}" : null,
+            'backdrop' => $movie['backdrop_path'] ? "https://image.tmdb.org/t/p/w1280{$movie['backdrop_path']}" : null
+        ];
+    }
+
+    public function getMovieDetails(int $movieId): array
+    {
+        $response = Http::get("{$this->baseUrl}/movie/{$movieId}", [
+            'api_key' => $this->apiKey,
+            'language' => 'en-US',
+            'append_to_response' => 'credits,videos'
+        ]);
+
+        return $response->json();
+    }
+
 
     public function getAllMovies($page = 1, $genre = null): JsonResponse
     {
@@ -68,20 +131,45 @@ class TMDBService
 
         $formattedMovies = collect($movies['results'] ?? [])
             ->map(function ($movie) use ($genreName) {
-                $genreNames = collect($movie['genre_ids'] ?? [])
-                    ->map(fn ($id) => $genreName[$id] ?? null)
-                    ->filter()
-                    ->values();
+                try {
+                    $details = $this->getMovieDetails($movie['id']);
 
-                return [
-                    'title' => $movie['title'] ?? null,
-                    'genres' => $genreNames,
-                    'description' => $movie['overview'] ?? null,
-                    'rating' => $movie['vote_average'] ?? null,
-                    'year' => $movie['release_date'] ? substr($movie['release_date'], 0, 4) : null,
-                    'image' => $movie['poster_path'] ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path'] : null,
-                ];
+                    $genreNames = collect($movie['genre_ids'] ?? [])
+                        ->map(fn($id) => $genreName[$id] ?? null)
+                        ->filter()
+                        ->values();
+
+                    return [
+                        'id' => $movie['id'],
+                        'title' => $movie['title'] ?? $details['title'] ?? null,
+                        'genres' => $genreNames,
+                        'description' => $movie['overview'] ?? $details['overview'] ?? null,
+                        'rating' => $movie['vote_average'] ?? $details['vote_average'] ?? null,
+                        'runtime' => $details['runtime'] ?? null,
+                        'release_date' => isset($movie['release_date'])
+                            ? date('d/m/Y', strtotime($movie['release_date']))
+                            : (isset($details['release_date'])
+                                ? date('d/m/Y', strtotime($details['release_date']))
+                                : null),
+                        'year' => $movie['release_date']
+                            ? substr($movie['release_date'], 0, 4)
+                            : (isset($details['release_date'])
+                                ? substr($details['release_date'], 0, 4)
+                                : null),
+                        'poster' => $movie['poster_path']
+                            ? 'https://image.tmdb.org/t/p/w500' . $movie['poster_path']
+                            : null,
+                        'backdrop' => $movie['backdrop_path']
+                            ? 'https://image.tmdb.org/t/p/w1280' . $movie['backdrop_path']
+                            : null,
+                        'tagline' => $details['tagline'] ?? null,
+                    ];
+                } catch (\Exception $e) {
+                    \Log::error("Failed to fetch details for movie {$movie['id']}: " . $e->getMessage());
+                    return null;
+                }
             })
+            ->filter()
             ->values();
 
         if ($formattedMovies->isEmpty()) {
@@ -89,6 +177,9 @@ class TMDBService
         }
 
         return response()->json([
+            'page' => $movies['page'] ?? 1,
+            'total_pages' => $movies['total_pages'] ?? 1,
+            'total_results' => $movies['total_results'] ?? 0,
             'message' => 'Movies fetched successfully',
             'data' => $formattedMovies,
         ]);
@@ -138,25 +229,32 @@ class TMDBService
             ->map(function ($similar) {
                 return [
                     'title' => $similar['title'] ?? null,
-                    'image' => ! empty($similar['poster_path'])
-                        ? 'https://image.tmdb.org/t/p/w500'.$similar['poster_path']
+                    'image' => !empty($similar['poster_path'])
+                        ? 'https://image.tmdb.org/t/p/w500' . $similar['poster_path']
                         : 'https://via.placeholder.com/500x750?text=No+Image',
                 ];
             });
 
         $movie = [
+            'id' => $movie['id'] ?? null,
             'title' => $movie['title'] ?? 'Unknown Title',
-            'genres' => ! empty($movie['genres'])
+            'genres' => !empty($movie['genres'])
                 ? collect($movie['genres'])->pluck('name')->all()
                 : ['Unknown Genre'],
             'description' => $movie['overview'] ?? 'No description available.',
             'tagline' => $movie['tagline'] ?? 'No tagline available.',
-            'runtime' => $movie['runtime'] ?? 0,
             'rating' => $movie['vote_average'] ?? 'N/A',
+            'runtime' => $movie['runtime'] ?? 0,
+            'release_date' => isset($movie['release_date']) && $movie['release_date'] !== ''
+                ? date('d/m/Y', strtotime($movie['release_date']))
+                : 'Unknown',
             'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
                 ? substr($movie['release_date'], 0, 4)
                 : 'Unknown',
-            'image' => ! empty($movie['backdrop_path'])
+            'poster' => !empty($movie['poster_path'])
+                ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path']
+                : 'https://via.placeholder.com/500x750?text=No+Poster',
+            'backdrop' => !empty($movie['backdrop_path'])
                 ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
                 : 'https://via.placeholder.com/1280x720?text=No+Image+Available',
             'similar_movies' => $formattedSimilar,
@@ -166,47 +264,5 @@ class TMDBService
             'message' => 'Movie fetched successfully',
             'data' => $movie,
         ]);
-    }
-
-    public function getGenreIdByName($genreName)
-    {
-        $response = Http::get('https://api.themoviedb.org/3/genre/movie/list', [
-            'api_key' => $this->apiKey,
-        ]);
-
-        $genres = collect($response->json('genres'));
-
-        $genre = $genres->firstWhere('name', ucfirst(strtolower($genreName)));
-
-        return $genre['id'] ?? null;
-    }
-
-    public function getMoviesByGenre($genreNameOrId, $page = 1): array
-    {
-        if (! is_numeric($genreNameOrId)) {
-            $genreNames = is_array($genreNameOrId) ? $genreNameOrId : [$genreNameOrId];
-            $genreIds = [];
-
-            foreach ($genreNames as $name) {
-                $id = $this->getGenreIdByName($name);
-                if ($id) {
-                    $genreIds[] = $id;
-                }
-            }
-
-            if (empty($genreIds)) {
-                return [];
-            }
-        } else {
-            $genreIds = [$genreNameOrId];
-        }
-
-        $response = Http::get('https://api.themoviedb.org/3/discover/movie', [
-            'api_key' => $this->apiKey,
-            'page' => $page,
-            'with_genres' => implode(',', $genreIds),
-        ]);
-
-        return $response->json();
     }
 }
