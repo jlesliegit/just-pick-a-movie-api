@@ -90,10 +90,9 @@ class TMDBService
             'title' => $movie['title'] ?? null,
             'genres' => array_filter(array_map(function($genreId) use ($genreList) {
                 return $genreList[$genreId] ?? null;
-            }, $movie['genre_ids'] ?? [])),¬
+            }, $movie['genre_ids'] ?? [])),
             'description' => $movie['overview'] ?? null,
             'rating' => isset($movie['vote_average']) ? round($movie['vote_average'], 1) : null,
-//            'runtime' => null,
             'release_date' => $releaseDate,
             'year' => $year,
             'poster' => $movie['poster_path'] ? "https://image.tmdb.org/t/p/w500{$movie['poster_path']}" : null,
