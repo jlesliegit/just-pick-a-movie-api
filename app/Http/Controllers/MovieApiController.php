@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Mood;
 use App\Models\Genre;
+use App\Models\Mood;
 use App\Services\TmdbService;
 use Illuminate\Http\JsonResponse;
 
@@ -20,15 +20,15 @@ class MovieApiController extends Controller
     {
         $mood = Mood::with('genres')->where('name', $moodName)->first();
 
-        if (!$mood) {
+        if (! $mood) {
             return response()->json([
                 'error' => 'Mood not found',
-                'available_moods' => Mood::pluck('name')->toArray()
+                'available_moods' => Mood::pluck('name')->toArray(),
             ], 404);
         }
 
         $tmdbGenreIds = $mood->genres->pluck('id')
-            ->filter(fn($id) => is_numeric($id) && $id > 0)
+            ->filter(fn ($id) => is_numeric($id) && $id > 0)
             ->unique()
             ->values()
             ->toArray();
@@ -39,8 +39,8 @@ class MovieApiController extends Controller
                 'mood_details' => [
                     'name' => $mood->name,
                     'genre_count' => $mood->genres->count(),
-                    'genre_sample' => $mood->genres->take(3)->pluck('name', 'id')
-                ]
+                    'genre_sample' => $mood->genres->take(3)->pluck('name', 'id'),
+                ],
             ], 400);
         }
 
@@ -61,6 +61,7 @@ class MovieApiController extends Controller
         $filteredMovies = $allMovies->filter(function ($movie) use ($tmdbGenreIds) {
             $genreIds = $movie['genre_ids'] ?? [];
             $matchCount = collect($genreIds)->intersect($tmdbGenreIds)->count();
+
             return $matchCount >= 2;
         });
 
@@ -71,8 +72,8 @@ class MovieApiController extends Controller
                 'error' => 'No movies found for these genres',
                 'technical_details' => [
                     'tried_genres' => $tmdbGenreIds,
-                    'api_errors' => $errors
-                ]
+                    'api_errors' => $errors,
+                ],
             ], 404);
         }
 
@@ -84,7 +85,7 @@ class MovieApiController extends Controller
                 $details = $this->tmdbService->getMovieDetails($movie['id']);
 
                 $genreNames = collect($movie['genre_ids'] ?? [])
-                    ->map(fn($id) => $genreNameMap[$id] ?? null)
+                    ->map(fn ($id) => $genreNameMap[$id] ?? null)
                     ->filter()
                     ->values()
                     ->all();
@@ -92,7 +93,7 @@ class MovieApiController extends Controller
                 $moviesWithDetails->push([
                     'id' => $movie['id'],
                     'title' => $movie['title'] ?? $details['title'] ?? 'Unknown Title',
-                    'genres' => !empty($genreNames) ? $genreNames : ['Unknown Genre'],
+                    'genres' => ! empty($genreNames) ? $genreNames : ['Unknown Genre'],
                     'description' => $movie['overview'] ?? $details['overview'] ?? 'No description available.',
                     'tagline' => $details['tagline'] ?? 'No tagline available.',
                     'rating' => $movie['vote_average'] ?? $details['vote_average'] ?? 'N/A',
@@ -101,17 +102,18 @@ class MovieApiController extends Controller
                     'year' => isset($movie['release_date']) && $movie['release_date'] !== ''
                         ? substr($movie['release_date'], 0, 4)
                         : (isset($details['release_date']) ? substr($details['release_date'], 0, 4) : 'Unknown'),
-                    'poster' => !empty($movie['poster_path'])
-                        ? 'https://image.tmdb.org/t/p/w500' . $movie['poster_path']
+                    'poster' => ! empty($movie['poster_path'])
+                        ? 'https://image.tmdb.org/t/p/w500'.$movie['poster_path']
                         : 'https://via.placeholder.com/500x750?text=No+Poster',
-                    'backdrop' => !empty($movie['backdrop_path'])
-                        ? 'https://image.tmdb.org/t/p/w1280' . $movie['backdrop_path']
+                    'backdrop' => ! empty($movie['backdrop_path'])
+                        ? 'https://image.tmdb.org/t/p/w1280'.$movie['backdrop_path']
                         : 'https://via.placeholder.com/1280x720?text=No+Backdrop',
                     'imdb_id' => $details['imdb_id'] ?? null,
                     'status' => $details['status'] ?? null,
                 ]);
             } catch (\Exception $e) {
-                \Log::error("Failed to process movie {$movie['id']}: " . $e->getMessage());
+                \Log::error("Failed to process movie {$movie['id']}: ".$e->getMessage());
+
                 continue;
             }
         }
@@ -119,7 +121,7 @@ class MovieApiController extends Controller
         return response()->json([
             'message' => "$moodName movies fetched successfully",
             'count' => $moviesWithDetails->count(),
-            'data' => $moviesWithDetails
+            'data' => $moviesWithDetails,
         ]);
     }
 
@@ -166,7 +168,8 @@ class MovieApiController extends Controller
                         'tagline' => $details['tagline'] ?? null,
                     ];
                 } catch (\Exception $e) {
-                    \Log::error("Failed to fetch details for movie {$movie['id']}: " . $e->getMessage());
+                    \Log::error("Failed to fetch details for movie {$movie['id']}: ".$e->getMessage());
+
                     return null;
                 }
             })
@@ -182,5 +185,4 @@ class MovieApiController extends Controller
             'data' => $formattedMovies,
         ]);
     }
-
 }
